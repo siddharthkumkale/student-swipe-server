@@ -3,28 +3,59 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/ai_service_config.dart';
 import 'auth_service.dart';
 
-/// Calls your Render (or other) Node service for AI bot match + chat.
+/// Calls your Render service for AI bots (match + chat + demo profile seed).
 ///
-/// Build/run with:
-/// `flutter run --dart-define=AI_BOT_BASE_URL=https://YOUR-SERVICE.onrender.com`
-///
-/// Omit the trailing slash. If unset, all methods no-op (AI bots disabled).
+/// Uses [kDefaultAiBotBaseUrl] so a normal `flutter run` works. Override with:
+/// `--dart-define=AI_BOT_BASE_URL=https://other.onrender.com`
 class AiBotBridge {
   AiBotBridge._();
   static final AiBotBridge instance = AiBotBridge._();
 
-  static const String _baseUrl = String.fromEnvironment(
+  static const String _fromDefine = String.fromEnvironment(
     'AI_BOT_BASE_URL',
     defaultValue: '',
   );
 
-  bool get isConfigured => _baseUrl.isNotEmpty;
+  static String get _resolvedBase {
+    final fromEnv = _fromDefine.trim();
+    if (fromEnv.isNotEmpty) {
+      return fromEnv.replaceAll(RegExp(r'/$'), '');
+    }
+    return kDefaultAiBotBaseUrl.trim().replaceAll(RegExp(r'/$'), '');
+  }
+
+  bool get isConfigured => _resolvedBase.isNotEmpty;
 
   Uri _u(String path) {
-    final b = _baseUrl.replaceAll(RegExp(r'/$'), '');
-    return Uri.parse('$b$path');
+    return Uri.parse('${_resolvedBase}$path');
+  }
+
+  /// Creates demo AI user docs in Firestore (idempotent). Safe to call every app open.
+  Future<void> seedDemoAiProfiles() async {
+    if (!isConfigured) return;
+    final token = await AuthService.instance.getIdToken();
+    if (token == null) return;
+    try {
+      final res = await http
+          .post(
+            _u('/api/seed-demo-profiles'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200 && kDebugMode) {
+        debugPrint('AiBotBridge.seedDemo: ${res.statusCode} ${res.body}');
+      }
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('AiBotBridge.seedDemo failed: $e\n$st');
+      }
+    }
   }
 
   Future<void> ensureMatchAfterLike({required String botUid}) async {

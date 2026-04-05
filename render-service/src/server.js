@@ -18,31 +18,65 @@ const { FieldValue } = require('firebase-admin/firestore');
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-function initAdmin() {
+let firestoreReady = false;
+
+/** Returns true if Firebase Admin is usable (does not exit the process). */
+function tryInitAdmin() {
+  if (firestoreReady) return true;
   let raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw && process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
     raw = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8');
   }
-  if (!raw) {
-    console.error('Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_BASE64');
-    process.exit(1);
+  if (!raw) return false;
+  try {
+    const cred = JSON.parse(raw);
+    if (admin.apps.length === 0) {
+      admin.initializeApp({ credential: admin.credential.cert(cred) });
+    }
+    firestoreReady = true;
+    console.log('Firebase Admin initialized');
+    return true;
+  } catch (e) {
+    console.error('Firebase init failed:', e.message || e);
+    return false;
   }
-  const cred = JSON.parse(raw);
-  admin.initializeApp({ credential: admin.credential.cert(cred) });
 }
 
-initAdmin();
-const db = admin.firestore();
+tryInitAdmin();
+if (!firestoreReady) {
+  console.warn(
+    '[student-swipe-ai] No FIREBASE_SERVICE_ACCOUNT_JSON / _BASE64 yet — service stays online; add the env var in Render and redeploy for AI features.'
+  );
+}
 
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json({ limit: '256kb' }));
 
+function requireFirebase(req, res, next) {
+  if (!tryInitAdmin()) {
+    return res.status(503).json({
+      error:
+        'Server missing Firebase credentials. Render → Web Service "student-swipe-ai" → Environment → add FIREBASE_SERVICE_ACCOUNT_JSON (one-line JSON) or FIREBASE_SERVICE_ACCOUNT_BASE64 → Save → Redeploy.',
+    });
+  }
+  req.fs = admin.firestore();
+  next();
+}
+
 app.get('/', (_req, res) => {
-  res.type('text').send('Student Swipe AI service OK. POST /api/ensure-match, /api/chat-reply');
+  res.type('text').send(
+    `Student Swipe AI service. Firebase: ${firestoreReady ? 'ok' : 'NOT CONFIGURED'}. Groq: ${process.env.GROQ_API_KEY ? 'set' : 'NOT SET'}. POST /api/ensure-match, /api/chat-reply`,
+  );
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) =>
+  res.json({
+    ok: true,
+    firebase: firestoreReady,
+    groq: Boolean(process.env.GROQ_API_KEY),
+  }),
+);
 
 async function verifyUser(req) {
   const h = req.headers.authorization || '';
@@ -58,6 +92,84 @@ async function verifyUser(req) {
 function chatId(a, b) {
   return [a, b].sort().join('_');
 }
+
+/** Fixed demo bot UIDs (Firestore only — no Auth login). Idempotent seed. */
+const DEMO_AI_BOTS = [
+  {
+    uid: 'ss_demo_ai_01',
+    name: 'Alex',
+    email: 'alex.demo@student-swipe.app',
+    university: 'Riverside University',
+    course: 'Computer Science',
+    year: '2nd year',
+    bio: 'Hackathons, coffee, and late-night coding. Always down to team up on a project.',
+    skills: ['Python', 'UI design', 'Public speaking'],
+    isAiBot: true,
+    aiPersona: 'Warm, uses short messages and occasional emoji.',
+  },
+  {
+    uid: 'ss_demo_ai_02',
+    name: 'Jordan',
+    email: 'jordan.demo@student-swipe.app',
+    university: 'Riverside University',
+    course: 'Business & Marketing',
+    year: '3rd year',
+    bio: 'Love pitching ideas and meeting builders. Let’s make something people actually use.',
+    skills: ['Marketing', 'Pitch decks', 'Notion'],
+    isAiBot: true,
+    aiPersona: 'Professional but friendly; concise replies.',
+  },
+  {
+    uid: 'ss_demo_ai_03',
+    name: 'Sam',
+    email: 'sam.demo@student-swipe.app',
+    university: 'Metro State',
+    course: 'Psychology',
+    year: '1st year',
+    bio: 'Here for study buddies and chill convos between classes.',
+    skills: ['Research', 'Writing', 'Spanish'],
+    isAiBot: true,
+    aiPersona: 'Supportive peer; casual tone.',
+  },
+];
+
+/** Ensure demo AI profiles exist (Admin write; any logged-in user may trigger). */
+app.post('/api/seed-demo-profiles', requireFirebase, async (req, res) => {
+  const user = await verifyUser(req);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+  const db = req.fs;
+  try {
+    let created = 0;
+    for (const b of DEMO_AI_BOTS) {
+      const ref = db.doc(`users/${b.uid}`);
+      const snap = await ref.get();
+      if (snap.exists) continue;
+      await ref.set(
+        {
+          uid: b.uid,
+          name: b.name,
+          email: b.email,
+          university: b.university,
+          course: b.course,
+          year: b.year,
+          bio: b.bio,
+          skills: b.skills,
+          additionalPhotos: [],
+          isAiBot: true,
+          aiPersona: b.aiPersona,
+          createdAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      created += 1;
+    }
+    return res.json({ ok: true, created, total: DEMO_AI_BOTS.length });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
 
 async function callGroq(system, messages) {
   const key = process.env.GROQ_API_KEY;
@@ -83,10 +195,11 @@ async function callGroq(system, messages) {
 }
 
 /** After human likes an AI profile: bot likes back + match docs. */
-app.post('/api/ensure-match', async (req, res) => {
+app.post('/api/ensure-match', requireFirebase, async (req, res) => {
   const user = await verifyUser(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+  const db = req.fs;
   const fromUid = user.uid;
   const { botUid } = req.body || {};
   if (!botUid || typeof botUid !== 'string') {
@@ -137,10 +250,11 @@ app.post('/api/ensure-match', async (req, res) => {
 });
 
 /** Generate AI reply to the latest human message in chat with botUid. */
-app.post('/api/chat-reply', async (req, res) => {
+app.post('/api/chat-reply', requireFirebase, async (req, res) => {
   const user = await verifyUser(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+  const db = req.fs;
   const humanUid = user.uid;
   const { botUid } = req.body || {};
   if (!botUid || typeof botUid !== 'string') {

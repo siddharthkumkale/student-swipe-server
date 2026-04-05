@@ -40,6 +40,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
     super.initState();
     _loadCurrentUserProfile();
     _loadProfiles();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AiBotBridge.instance.seedDemoAiProfiles();
+    });
   }
 
   Future<void> _loadCurrentUserProfile() async {
