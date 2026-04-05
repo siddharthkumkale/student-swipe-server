@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "336039829559",
+    "project_id": "studentswipe-549e9",
+    "storage_bucket": "studentswipe-549e9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336039829559:android:7ced4a92f50a81b49adfb2",
+        "android_client_info": {
+          "package_name": "com.example.student_swipe"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "336039829559-fe9hvqqcehscsv1hld26r7ehj13vqqht.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDk4KhiHDXgXLtGGf9lEepmy8QFUT_Gl48"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "336039829559-fe9hvqqcehscsv1hld26r7ehj13vqqht.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "336039829559-lniv84galv04uhk28c1qvneipphu7a1i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.studentSwipe"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336039829559:android:98661ec4a0e441ea9adfb2",
+        "android_client_info": {
+          "package_name": "com.studentswipe.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "336039829559-vp0p4hc4ubqd9uj4h4hj0kn1789hmve0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.studentswipe.app",
+            "certificate_hash": "080b6ac747c29cfc20cf9cd0a031f7376e0e1b49"
+          }
+        },
+        {
+          "client_id": "336039829559-fe9hvqqcehscsv1hld26r7ehj13vqqht.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDk4KhiHDXgXLtGGf9lEepmy8QFUT_Gl48"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "336039829559-fe9hvqqcehscsv1hld26r7ehj13vqqht.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "336039829559-lniv84galv04uhk28c1qvneipphu7a1i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.studentSwipe"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,9 @@
+{
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter":{"platforms":{"android":{"default":{"projectId":"studentswipe-549e9","appId":"1:336039829559:android:7ced4a92f50a81b49adfb2","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"studentswipe-549e9","configurations":{"android":"1:336039829559:android:7ced4a92f50a81b49adfb2","ios":"1:336039829559:ios:032938f053e2aad39adfb2","macos":"1:336039829559:ios:032938f053e2aad39adfb2","web":"1:336039829559:web:f3d5fdbb65571f179adfb2","windows":"1:336039829559:web:d57860cee4146b679adfb2"}}}}}}

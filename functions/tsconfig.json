@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "noImplicitReturns": true,
+    "outDir": "lib",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "compileOnSave": true,
+  "include": ["src"]
+}

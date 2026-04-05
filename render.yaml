@@ -1,0 +1,16 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# After connect, add secrets in the dashboard: GROQ_API_KEY + Firebase service account.
+
+services:
+  - type: web
+    name: student-swipe-ai
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: render-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
