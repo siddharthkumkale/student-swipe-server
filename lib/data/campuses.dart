@@ -211,3 +211,22 @@ const List<Campus> nzCampuses = [
   ),
 ];
 
+/// Resolves a saved profile [university] string to a campus when editing.
+/// Returns null if no match (custom text still allowed via [TextFormField]).
+Campus? campusMatchingStoredUniversity(String? university) {
+  final t = university?.trim() ?? '';
+  if (t.isEmpty) return null;
+  for (final c in nzCampuses) {
+    if (c.name == t) return c;
+  }
+  for (final c in nzCampuses) {
+    if (t == '${c.name}, ${c.city}' || t == '${c.name} (${c.city})') {
+      return c;
+    }
+  }
+  for (final c in nzCampuses) {
+    if (t.contains(c.name) || c.name.contains(t)) return c;
+  }
+  return null;
+}
+

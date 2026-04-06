@@ -1,6 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../models/match_record.dart';
+import '../services/auth_service.dart';
+import '../services/profile_service.dart';
+import '../services/push_notification_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/tinder_style.dart';
 import 'notifications_screen.dart';
@@ -36,7 +41,34 @@ class _MainShellState extends State<MainShell> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final uid = AuthService.instance.currentUser?.uid;
+    if (uid != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        PushNotificationService.instance.attachToUser(uid);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    PushNotificationService.instance.detachUser();
+    super.dispose();
+  }
+
+  void _onNavTap(int i) {
+    setState(() => _currentIndex = i);
+    final uid = AuthService.instance.currentUser?.uid;
+    if (i == 1 && uid != null) {
+      ProfileService.instance.markNotificationsTabVisited(uid);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final uid = AuthService.instance.currentUser?.uid;
+
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 260),
@@ -70,41 +102,85 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.card.withValues(alpha: 0.97),
-          border: Border(
-            top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, -6),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            child: Row(
-              children: List.generate(_tabs.length, (i) {
-                final tab = _tabs[i];
-                final selected = _currentIndex == i;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: _NavItem(
-                      label: tab.label,
-                      icon: tab.icon,
-                      selectedIcon: tab.selectedIcon,
-                      selected: selected,
-                      onTap: () => setState(() => _currentIndex = i),
-                    ),
-                  ),
+      bottomNavigationBar: uid == null
+          ? null
+          : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+              builder: (context, userSnap) {
+                final data = userSnap.data?.data();
+                final visitedTs = data?['notificationsLastVisitedAt'] as Timestamp?;
+                final visitedAt = visitedTs?.toDate();
+                return StreamBuilder<List<MatchRecord>>(
+                  stream: ProfileService.instance.matchesStream(uid),
+                  builder: (context, matchSnap) {
+                    final matches = matchSnap.data ?? [];
+                    final matchBadgeCount =
+                        ProfileService.instance.countNewMatchNotifications(matches, visitedAt);
+                    return _BottomNavBar(
+                      tabs: _tabs,
+                      currentIndex: _currentIndex,
+                      notificationBadgeCount: matchBadgeCount,
+                      onTap: _onNavTap,
+                    );
+                  },
                 );
-              }),
+              },
             ),
+    );
+  }
+}
+
+class _BottomNavBar extends StatelessWidget {
+  final List<_TabData> tabs;
+  final int currentIndex;
+  final int notificationBadgeCount;
+  final ValueChanged<int> onTap;
+
+  const _BottomNavBar({
+    required this.tabs,
+    required this.currentIndex,
+    required this.notificationBadgeCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.card.withValues(alpha: 0.97),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          child: Row(
+            children: List.generate(tabs.length, (i) {
+              final tab = tabs[i];
+              final selected = currentIndex == i;
+              final badge = i == 1 && notificationBadgeCount > 0 ? notificationBadgeCount : null;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: _NavItem(
+                    label: tab.label,
+                    icon: tab.icon,
+                    selectedIcon: tab.selectedIcon,
+                    selected: selected,
+                    badgeCount: badge,
+                    onTap: () => onTap(i),
+                  ),
+                ),
+              );
+            }),
           ),
         ),
       ),
@@ -128,6 +204,7 @@ class _NavItem extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
   final bool selected;
+  final int? badgeCount;
   final VoidCallback onTap;
 
   const _NavItem({
@@ -136,6 +213,7 @@ class _NavItem extends StatelessWidget {
     required this.selectedIcon,
     required this.selected,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -198,10 +276,48 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                displayIcon,
-                size: 26,
-                color: selected ? accent : Colors.white.withValues(alpha: 0.55),
+              SizedBox(
+                height: 28,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      displayIcon,
+                      size: 26,
+                      color: selected ? accent : Colors.white.withValues(alpha: 0.55),
+                    ),
+                    if (badgeCount != null && badgeCount! > 0)
+                      Positioned(
+                        top: -6,
+                        right: -2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.55),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            badgeCount! > 99 ? '99+' : '$badgeCount',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 5),
               Text(

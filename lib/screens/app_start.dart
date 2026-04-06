@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/auth_service.dart';
 import 'splash_screen.dart';
 import 'onboarding_screen.dart';
 import 'auth/auth_gate.dart';
@@ -48,11 +49,27 @@ class _AppStartState extends State<AppStart> {
 
   void _goAuth() => setState(() => _step = 2);
 
+  void _continueFromSplashSignedIn() {
+    setState(() => _step = 2);
+  }
+
   @override
   Widget build(BuildContext context) {
     Widget current;
     if (_step == 0) {
-      current = SplashScreen(onGetStarted: _goNext);
+      current = StreamBuilder(
+        stream: AuthService.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          final waiting = snapshot.connectionState == ConnectionState.waiting && snapshot.data == null;
+          final signedIn = snapshot.data != null;
+          return SplashScreen(
+            resolvingAuth: waiting,
+            signedIn: signedIn,
+            onContinueAsGuest: _goNext,
+            onContinueSignedIn: _continueFromSplashSignedIn,
+          );
+        },
+      );
     } else if (_step == 1) {
       current = OnboardingScreen(onFinish: _finishOnboarding);
     } else {

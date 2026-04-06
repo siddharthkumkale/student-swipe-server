@@ -1039,11 +1039,11 @@ class _DiscoverToolbarIcon extends StatelessWidget {
             ),
             if (badgeCount != null && badgeCount! > 0)
               Positioned(
-                top: -3,
-                right: -3,
+                top: -6,
+                right: -4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
                   decoration: BoxDecoration(
                     color: AppTheme.accent,
                     shape: BoxShape.circle,
@@ -1058,7 +1058,7 @@ class _DiscoverToolbarIcon extends StatelessWidget {
                   child: Text(
                     badgeCount! > 99 ? '99+' : '$badgeCount',
                     style: GoogleFonts.outfit(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                       height: 1,

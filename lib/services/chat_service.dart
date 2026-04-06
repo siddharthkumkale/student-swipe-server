@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/chat_live_meta.dart';
 import '../models/chat_message.dart';
 import '../models/chat_preview.dart';
 import 'ai_bot_bridge.dart';
@@ -94,6 +95,21 @@ class ChatService {
           otherTyping: otherTyping,
         );
       }).toList();
+    });
+  }
+
+  /// Typing + last message metadata for the chat header (single doc listener).
+  Stream<ChatLiveMeta> chatLiveMetaStream(String currentUid, String otherUid) {
+    final cid = chatId(currentUid, otherUid);
+    return _firestore.collection(_chatsCollection).doc(cid).snapshots().map((snap) {
+      final d = snap.data() ?? <String, dynamic>{};
+      final ts = d['lastMessageAt'] as Timestamp?;
+      final typingMap = (d['typing'] as Map<String, dynamic>?) ?? {};
+      return ChatLiveMeta(
+        lastMessageAt: ts?.toDate(),
+        otherTyping: typingMap[otherUid] == true,
+        lastSenderId: d['lastSenderId'] as String?,
+      );
     });
   }
 

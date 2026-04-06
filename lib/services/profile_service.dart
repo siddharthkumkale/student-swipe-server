@@ -37,6 +37,13 @@ class ProfileService {
     return _firestore.collection(_usersCollection).doc(uid).snapshots();
   }
 
+  /// All user profiles (for maps / stats). Requires sign-in; same read rules as Discover.
+  Stream<List<UserProfile>> allProfilesStream() {
+    return _firestore.collection(_usersCollection).snapshots().map(
+          (snapshot) => snapshot.docs.map((d) => UserProfile.fromFirestore(d)).toList(),
+        );
+  }
+
   /// Stream of profiles to swipe (excludes current user, already-swiped users, and blocked users).
   Stream<List<UserProfile>> getSwipeableProfiles(String currentUid) {
     return _firestore.collection(_usersCollection).snapshots().asyncMap(
@@ -180,6 +187,20 @@ class ProfileService {
     batch.delete(otherMatchRef);
 
     await batch.commit();
+  }
+
+  /// Call when the user opens the Notifications tab so the match badge can clear.
+  Future<void> markNotificationsTabVisited(String uid) async {
+    await _firestore.collection(_usersCollection).doc(uid).set(
+      {'notificationsLastVisitedAt': Timestamp.fromDate(DateTime.now())},
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Matches newer than the last time the user opened the Notifications tab.
+  int countNewMatchNotifications(List<MatchRecord> matches, DateTime? lastVisitedAt) {
+    if (lastVisitedAt == null) return matches.length;
+    return matches.where((m) => m.matchedAt.isAfter(lastVisitedAt)).length;
   }
 
   /// Real-time stream of the current user's matches (for Notifications screen).

@@ -83,6 +83,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (p != null) {
       _nameController.text = p.name;
       _universityController.text = p.university;
+      _selectedCampus = campusMatchingStoredUniversity(p.university);
       _courseController.text = p.course;
       _yearController.text = p.year;
       _bioController.text = p.bio;
@@ -824,7 +825,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                                 suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF9CA3AF)),
                               ),
                               onTap: _openCampusPicker,
-                              validator: (_) => _selectedCampus == null ? 'Select your university' : null,
+                              validator: (_) {
+                                if (_selectedCampus != null) return null;
+                                if (_universityController.text.trim().isNotEmpty) {
+                                  return null;
+                                }
+                                return 'Select your university';
+                              },
                               style: _fieldTextStyle,
                             ),
                             const SizedBox(height: 14),
